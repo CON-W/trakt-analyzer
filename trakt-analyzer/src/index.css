@@ -1,0 +1,215 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-white font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-[#007AFF]/20;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/60 backdrop-blur-2xl border border-white/20 shadow-lg shadow-black/5;
+  }
+
+  .glass-card {
+    @apply bg-[#1C1C1E] backdrop-blur-xl rounded-2xl border border-white/10 shadow-xl shadow-black/20;
+  }
+
+  .glass-card-dark {
+    @apply bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 shadow-xl;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#007AFF] to-[#AF52DE];
+  }
+
+  .nav-link {
+    @apply relative px-4 py-2 text-sm font-medium text-[#8E8E93] hover:text-[#1C1C1E] transition-colors duration-200;
+  }
+
+  .nav-link.active {
+    @apply text-[#007AFF];
+  }
+
+  .nav-link.active::after {
+    content: '';
+    @apply absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#007AFF] rounded-full;
+  }
+
+  .stat-value {
+    @apply text-3xl sm:text-4xl font-bold tracking-tight;
+  }
+
+  .stat-label {
+    @apply text-xs sm:text-sm font-medium text-[#8E8E93] mt-1;
+  }
+
+  .pill {
+    @apply inline-flex items-center px-3 py-1 text-xs font-medium rounded-full;
+  }
+
+  .pill-blue {
+    @apply pill bg-[#007AFF]/10 text-[#007AFF];
+  }
+
+  .pill-green {
+    @apply pill bg-[#34C759]/10 text-[#34C759];
+  }
+
+  .pill-orange {
+    @apply pill bg-[#FF9500]/10 text-[#FF9500];
+  }
+
+  .pill-purple {
+    @apply pill bg-[#AF52DE]/10 text-[#AF52DE];
+  }
+
+  .pill-pink {
+    @apply pill bg-[#FF2D55]/10 text-[#FF2D55];
+  }
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[#D2D2D7] rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[#AEAEB2];
+}
+
+/* Chart container */
+.chart-container {
+  @apply relative w-full;
+  min-height: 250px;
+}
+
+/* Hide scrollbar for horizontal scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+/* Scale in animation */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+/* Global background decorations */
+.bg-decorations {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bg-decorations > div:nth-child(1) {
+  position: absolute;
+  top: -10rem;
+  right: -10rem;
+  width: 24rem;
+  height: 24rem;
+  background: rgba(0, 122, 255, 0.08);
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.bg-decorations > div:nth-child(2) {
+  position: absolute;
+  bottom: -10rem;
+  left: -10rem;
+  width: 24rem;
+  height: 24rem;
+  background: rgba(255, 149, 0, 0.08);
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.bg-decorations > div:nth-child(3) {
+  position: absolute;
+  top: 33%;
+  left: 25%;
+  width: 500px;
+  height: 500px;
+  background: rgba(175, 82, 222, 0.06);
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.bg-decorations > div:nth-child(4) {
+  position: absolute;
+  bottom: 33%;
+  right: 25%;
+  width: 400px;
+  height: 400px;
+  background: rgba(52, 199, 89, 0.06);
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.bg-decorations > div:nth-child(5) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 600px;
+  background: rgba(255, 45, 85, 0.04);
+  border-radius: 50%;
+  filter: blur(80px);
+}
