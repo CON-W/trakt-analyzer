@@ -1,6 +1,6 @@
 # Trakt Analyzer 🎬
 
-> 一个现代化 Apple 风格的 Trakt.tv 观看记录分析工具。连接你的 Trakt 账号，深入分析你的观影习惯，用数据讲述你的观影故事。
+> 一个现代化风格的 Trakt.tv 观看记录分析工具。连接你的 Trakt 账号，深入分析你的观影习惯，用数据讲述你的观影故事。
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
