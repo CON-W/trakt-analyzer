@@ -8,9 +8,10 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import crypto from 'crypto';
+import fs from 'fs';
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -18,7 +19,8 @@ app.use(express.json({ limit: '50mb' }));
 // API Configuration
 const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID || '';
 const TRAKT_CLIENT_SECRET = process.env.TRAKT_CLIENT_SECRET || '';
-const TRAKT_REDIRECT_URI = 'http://localhost:5173/auth/callback';
+const TRAKT_REDIRECT_URI = process.env.TRAKT_REDIRECT_URI || 'http://localhost:5173/auth/callback';
+
 const TRAKT_API_URL = 'https://api.trakt.tv';
 const TRAKT_IMG_URL = 'https://walter.trakt.tv';
 
@@ -1849,7 +1851,30 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ============ Production Static Files (serve frontend build) ============
+
+const distPath = path.resolve(__dirname, '../dist');
+if (fs.existsSync(distPath)) {
+  console.log('📁 检测到前端构建文件，启用生产模式静态文件服务');
+  // Serve static files from dist directory
+  app.use(express.static(distPath));
+
+  // SPA fallback: all non-API routes serve index.html
+  app.get('*', (req, res) => {
+    // Don't catch API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  console.log('⚠️  未检测到前端构建文件 (dist/ 目录不存在)');
+  console.log('   开发模式：请确保前端开发服务器已启动 (http://localhost:5173)');
+  console.log('   生产模式：请先执行 npm run build 构建前端');
+}
+
 app.listen(PORT, () => {
+
   console.log(`🚀 Trakt Analyzer Server running on http://localhost:${PORT}`);
   if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
     console.warn('⚠️  TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET not configured!');
