@@ -3,10 +3,11 @@ import axios from 'axios';
 // API 基础路径 - 自动适配 Vite base 路径
 // 开发环境: /api
 // 生产环境(子路径): /trakt/api
-const API_BASE = `${import.meta.env.BASE_URL}api`;
+export const API_BASE = `${import.meta.env.BASE_URL}api`;
 
 
 const api = axios.create({
+
   baseURL: API_BASE,
   timeout: 30000,
 });

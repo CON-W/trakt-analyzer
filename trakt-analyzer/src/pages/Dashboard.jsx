@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchCombinedAnalysis } from '../utils/api';
+import { fetchCombinedAnalysis, API_BASE } from '../utils/api';
 import LoadingProgress from '../components/LoadingProgress';
+
 
 // ============ 背景海报墙 ============
 function BackgroundPoster({ items, onIndexChange }) {
@@ -226,11 +227,12 @@ function PersonModal({ person, type, onClose }) {
     setLoading(true);
     const sessionId = localStorage.getItem('trakt_session_id');
     const headers = sessionId ? { 'x-session-id': sessionId } : {};
-    fetch(`/api/person/${encodeURIComponent(person.name)}/credits`, { headers })
+    fetch(`${API_BASE}/person/${encodeURIComponent(person.name)}/credits`, { headers })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, [person?.name]);
+
 
   const credits = data?.credits || [];
   const sortedCredits = [...credits].sort((a, b) => {
@@ -325,11 +327,12 @@ function PersonCard({ person, type, avatarUrl, onClick }) {
     if (totalWorks !== null) return;
     const sessionId = localStorage.getItem('trakt_session_id');
     const headers = sessionId ? { 'x-session-id': sessionId } : {};
-    fetch(`/api/person/${encodeURIComponent(person.name)}/credits`, { headers })
+    fetch(`${API_BASE}/person/${encodeURIComponent(person.name)}/credits`, { headers })
       .then(r => r.json())
       .then(d => { if (d?.totalWorks) setTotalWorks(d.totalWorks); })
       .catch(() => {});
   }, [person.name]);
+
 
   return (
     <div onClick={onClick} className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 hover:bg-white/10 transition-all animate-fade-in group cursor-pointer">
@@ -434,11 +437,12 @@ function usePersonAvatars(names) {
     let cancelled = false;
     Promise.all(
       validNames.map(name =>
-        fetch(`/api/person/${encodeURIComponent(name)}`)
+        fetch(`${API_BASE}/person/${encodeURIComponent(name)}`)
           .then(r => r.json())
           .then(data => ({ name, url: data?.profile_path || null }))
           .catch(() => ({ name, url: null }))
       )
+
     ).then(results => {
       if (!cancelled) {
         const map = {};
@@ -492,7 +496,8 @@ export default function Dashboard() {
     try {
       const sessionId = localStorage.getItem('trakt_session_id');
       if (!sessionId) { setRecLoading(false); return; }
-      const res = await fetch('/api/recommendations', { headers: { 'x-session-id': sessionId } });
+      const res = await fetch(`${API_BASE}/recommendations`, { headers: { 'x-session-id': sessionId } });
+
       const data = await res.json();
       if (Array.isArray(data)) setRecommendations(data);
     } catch (e) {}
@@ -518,18 +523,19 @@ export default function Dashboard() {
   }, []);
 
   const fetchUpcoming = async () => {
-    try { const res = await fetch('/api/upcoming'); const data = await res.json(); setUpcoming(data); } catch (e) {}
+    try { const res = await fetch(`${API_BASE}/upcoming`); const data = await res.json(); setUpcoming(data); } catch (e) {}
   };
 
   const fetchTracking = async () => {
     try {
       const sessionId = localStorage.getItem('trakt_session_id');
       if (!sessionId) return;
-      const res = await fetch('/api/upcoming/tracking', { headers: { 'x-session-id': sessionId } });
+      const res = await fetch(`${API_BASE}/upcoming/tracking`, { headers: { 'x-session-id': sessionId } });
       const data = await res.json();
       if (Array.isArray(data)) setTracking(data);
     } catch (e) {}
   };
+
 
   const loadAnalysis = () => {
     setLoading(true); setEnriching(false); setError(null); setProgress(0);
