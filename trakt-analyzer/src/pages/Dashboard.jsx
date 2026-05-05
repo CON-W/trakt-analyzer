@@ -586,7 +586,23 @@ export default function Dashboard() {
     );
   }
 
-  if (!analysis) return null;
+  if (!analysis) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-[#007AFF] to-[#AF52DE] rounded-full flex items-center justify-center shadow-lg">
+            <span className="text-4xl">📊</span>
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-3">正在加载分析数据...</h2>
+          <p className="text-white/50">首次加载需要从 Trakt 获取数据，请耐心等待</p>
+          <div className="mt-8 flex justify-center">
+            <div className="w-12 h-12 border-3 border-[#007AFF]/30 border-t-[#007AFF] rounded-full animate-spin" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   const totalMovies = analysis.totalMovies || 0;
   const totalShows = analysis.totalShows || 0;
