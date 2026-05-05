@@ -1713,6 +1713,87 @@ app.get('/api/upcoming/tracking', async (req, res) => {
   }
 });
 
+// ============ Playback (继续观看) ============
+// 获取用户未看完的播放进度
+app.get('/api/playback', async (req, res) => {
+  const sessionId = req.headers['x-session-id'];
+  if (!sessionId) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const response = await traktApiCall('/sync/playback', sessionId, { limit: 100 });
+    const playbackData = response.data || [];
+
+    // 过滤出有进度的内容（progress > 0 且 < 100）
+    const inProgress = playbackData.filter(item => {
+      const progress = item.progress || 0;
+      return progress > 0 && progress < 100;
+    });
+
+    // 对每个项目获取海报信息
+    const enrichedPlayback = [];
+    for (const item of inProgress.slice(0, 20)) {
+      const isMovie = item.type === 'movie';
+      const ids = isMovie ? item.movie?.ids : item.show?.ids;
+      const title = isMovie ? item.movie?.title : item.show?.title;
+      const year = isMovie ? item.movie?.year : item.show?.year;
+
+      let poster = null;
+      let backdrop = null;
+
+      // 尝试从 TMDB 获取海报
+      if (ids?.tmdb && TMDB_API_KEY) {
+        try {
+          const mediaType = isMovie ? 'movie' : 'tv';
+          const detailRes = await axios.get(`${TMDB_API_URL}/${mediaType}/${ids.tmdb}`, {
+            params: { api_key: TMDB_API_KEY, language: TMDB_LANGUAGE },
+            timeout: 3000,
+          });
+          const d = detailRes.data;
+          poster = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
+          backdrop = d.backdrop_path ? `https://image.tmdb.org/t/p/w780${d.backdrop_path}` : null;
+        } catch (e) {}
+      }
+
+      // 回退到 Trakt 图片
+      if (!poster && ids?.trakt) {
+        poster = getTraktPosterUrl(ids.trakt, isMovie ? 'movies' : 'shows');
+      }
+
+      enrichedPlayback.push({
+        id: ids?.trakt || ids?.tmdb,
+        title,
+        year,
+        type: isMovie ? 'movie' : 'show',
+        poster,
+        backdrop,
+        progress: Math.round(item.progress || 0),
+        paused_at: item.paused_at,
+        expires_at: item.expires_at,
+        // 剧集信息
+        episode: item.episode ? {
+          season: item.episode.season,
+          number: item.episode.number,
+          title: item.episode.title,
+        } : null,
+        // 电影信息
+        movie: isMovie ? {
+          title: item.movie?.title,
+          year: item.movie?.year,
+        } : null,
+        show: !isMovie ? {
+          title: item.show?.title,
+          year: item.show?.year,
+        } : null,
+      });
+    }
+
+    res.json(enrichedPlayback);
+  } catch (error) {
+    console.error('Playback error:', error.message);
+    res.json([]);
+  }
+});
+
 // ============ 推荐内容 ============
 // 根据用户观看记录，从 TMDB 获取推荐（基于已看的高分作品）
 app.get('/api/recommendations', async (req, res) => {

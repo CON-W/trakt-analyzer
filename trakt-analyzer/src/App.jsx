@@ -46,7 +46,8 @@ function AppContent() {
       <div className="bg-decorations" />
       
       {isAuthenticated && <Navbar />}
-      <main className={`relative z-10 ${isAuthenticated ? 'pt-16' : ''}`}>
+      <main className={`relative z-10 ${isAuthenticated ? 'pt-14 sm:pt-16 pb-16 md:pb-0' : ''}`}>
+
         <Routes>
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Home />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

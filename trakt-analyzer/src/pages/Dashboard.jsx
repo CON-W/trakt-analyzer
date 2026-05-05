@@ -81,23 +81,24 @@ function QuoteCarousel({ items }) {
   const q = quotes[current];
   const title = q.enriched?.title_cn || q.title;
   return (
-    <div className="relative min-h-[65vh] flex items-center">
-      <div className="max-w-5xl px-8">
-        <p className="text-4xl md:text-5xl lg:text-6xl font-light italic text-white/85 leading-[1.6] tracking-normal" style={{ fontFamily: "'Georgia', 'Times New Roman', serif", textShadow: '0 4px 40px rgba(0,0,0,0.7)' }}>
+    <div className="relative min-h-[55vh] sm:min-h-[65vh] flex items-center">
+      <div className="max-w-5xl px-4 sm:px-8">
+        <p className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-light italic text-white/85 leading-[1.5] sm:leading-[1.6] tracking-normal" style={{ fontFamily: "'Georgia', 'Times New Roman', serif", textShadow: '0 4px 40px rgba(0,0,0,0.7)' }}>
           "{q.enriched?.tagline}"
         </p>
-        <p className="mt-10 text-xl md:text-2xl text-white/50 font-medium tracking-wide" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.5)' }}>
+        <p className="mt-6 sm:mt-10 text-lg sm:text-xl md:text-2xl text-white/50 font-medium tracking-wide" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.5)' }}>
           — {title}
         </p>
       </div>
       {quotes.length > 1 && (
-        <div className="absolute bottom-12 left-8 flex items-center gap-2">
+        <div className="absolute bottom-8 sm:bottom-12 left-4 sm:left-8 flex items-center gap-2">
           {quotes.map((_, i) => (
-            <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === current ? 'w-8 bg-white/40' : 'w-1 bg-white/20'}`} />
+            <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === current ? 'w-6 sm:w-8 bg-white/40' : 'w-1 bg-white/20'}`} />
           ))}
         </div>
       )}
     </div>
+
   );
 }
 
@@ -455,11 +456,53 @@ function usePersonAvatars(names) {
   return avatars;
 }
 
+// ============ 继续观看卡片 ============
+function PlaybackCard({ item }) {
+  const isMovie = item.type === 'movie';
+  const progress = item.progress || 0;
+  return (
+    <div className="flex-shrink-0 w-36 sm:w-44 group cursor-pointer animate-fade-in">
+      <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-black/30 mb-3 shadow-xl shadow-black/30 group-hover:scale-[1.04] transition-transform relative border border-white/5">
+        {item.poster ? (
+          <img src={item.poster} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-3xl">{isMovie ? '🎬' : '📺'}</div>
+        )}
+        {/* 进度条 */}
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/50">
+          <div className="h-full bg-[#007AFF] transition-all rounded-r-full" style={{ width: `${progress}%` }} />
+        </div>
+        {/* 进度百分比 */}
+        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+          {progress}%
+        </div>
+        {/* 剧集信息 */}
+        {item.episode && (
+          <div className="absolute bottom-3 left-3 right-3">
+            <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
+              <p className="text-[10px] text-white/70 font-medium truncate">S{item.episode.season}E{item.episode.number}</p>
+              {item.episode.title && (
+                <p className="text-[9px] text-white/40 truncate">{item.episode.title}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="text-sm font-semibold text-white/85 truncate">{item.title}</p>
+      <p className="text-xs text-white/45 truncate mt-1">
+        {isMovie ? '电影' : '剧集'}
+        {item.year ? ` · ${item.year}` : ''}
+      </p>
+    </div>
+  );
+}
+
 // ============ 主组件 ============
 export default function Dashboard() {
   const [analysis, setAnalysis] = useState(null);
   const [upcoming, setUpcoming] = useState({ movies: [], shows: [] });
   const [tracking, setTracking] = useState([]);
+  const [playback, setPlayback] = useState([]);
   const [upcomingTab, setUpcomingTab] = useState('upcoming');
   const [loading, setLoading] = useState(true);
   const [enriching, setEnriching] = useState(false);
@@ -480,6 +523,7 @@ export default function Dashboard() {
     loadAnalysis();
     fetchUpcoming();
     fetchTracking();
+    fetchPlayback();
     return () => { if (controllerRef.current) controllerRef.current.abort(); };
   }, []);
 
@@ -497,11 +541,20 @@ export default function Dashboard() {
       const sessionId = localStorage.getItem('trakt_session_id');
       if (!sessionId) { setRecLoading(false); return; }
       const res = await fetch(`${API_BASE}/recommendations`, { headers: { 'x-session-id': sessionId } });
-
       const data = await res.json();
       if (Array.isArray(data)) setRecommendations(data);
     } catch (e) {}
     setRecLoading(false);
+  };
+
+  const fetchPlayback = async () => {
+    try {
+      const sessionId = localStorage.getItem('trakt_session_id');
+      if (!sessionId) return;
+      const res = await fetch(`${API_BASE}/playback`, { headers: { 'x-session-id': sessionId } });
+      const data = await res.json();
+      if (Array.isArray(data)) setPlayback(data);
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -511,6 +564,7 @@ export default function Dashboard() {
         if (lastLoad && Date.now() - parseInt(lastLoad) < 5 * 60 * 1000) return;
         fetchUpcoming();
         fetchTracking();
+        fetchPlayback();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
@@ -518,7 +572,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => { fetchUpcoming(); fetchTracking(); }, 5 * 60 * 1000);
+    const interval = setInterval(() => { fetchUpcoming(); fetchTracking(); fetchPlayback(); }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -536,7 +590,6 @@ export default function Dashboard() {
     } catch (e) {}
   };
 
-
   const loadAnalysis = () => {
     setLoading(true); setEnriching(false); setError(null); setProgress(0);
     setProgressMessage('正在获取你的观影记录...'); setProgressStep('fetch');
@@ -547,6 +600,7 @@ export default function Dashboard() {
       onError: (msg) => { setError(msg); setLoading(false); setEnriching(false); setShowSkeleton(false); },
     });
   };
+
 
   const topDirector = analysis?.topDirectors?.[0] || null;
   const topActors = (analysis?.topCast || []).slice(0, 3);
@@ -646,8 +700,8 @@ export default function Dashboard() {
           <QuoteCarousel items={analysis.topItems} />
         </div>
 
-        {/* 右下角：统计信息 + 海报来源 - fixed 确保不被遮挡 */}
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4 bg-black/30 backdrop-blur-md rounded-2xl px-5 py-3">
+        {/* 统计信息 - 桌面端 fixed 右下角，移动端放到内容区 */}
+        <div className="hidden md:flex fixed bottom-6 right-6 z-50 items-center gap-4 bg-black/30 backdrop-blur-md rounded-2xl px-5 py-3">
           <div className="flex items-center gap-2 text-sm">
             <span>🎬</span>
             <span className="text-white/70 tabular-nums">{totalMovies}</span>
@@ -687,8 +741,54 @@ export default function Dashboard() {
         </div>
 
         {/* 下方内容：滚动可见 */}
-        <div className="px-6 pb-10 mt-16">
+        <div className="px-4 sm:px-6 pb-10 mt-8 sm:mt-16">
+          {/* 移动端统计信息 - 放在内容区顶部 */}
+          <div className="md:hidden mb-8">
+            <div className="flex flex-wrap items-center gap-3 bg-white/5 backdrop-blur-md rounded-2xl px-4 py-3">
+              <div className="flex items-center gap-1.5 text-sm">
+                <span>🎬</span>
+                <span className="text-white/70 tabular-nums">{totalMovies}</span>
+              </div>
+              <div className="w-px h-3 bg-white/10" />
+              <div className="flex items-center gap-1.5 text-sm">
+                <span>📺</span>
+                <span className="text-white/70 tabular-nums">{totalEpisodes}</span>
+              </div>
+              {avgRating > 0 && (
+                <>
+                  <div className="w-px h-3 bg-white/10" />
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <span>⭐</span>
+                    <span className="text-white/70 tabular-nums">{avgRating.toFixed(1)}</span>
+                  </div>
+                </>
+              )}
+              {totalWatchTime && (
+                <>
+                  <div className="w-px h-3 bg-white/10" />
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <span>⏱️</span>
+                    <span className="text-white/70 tabular-nums">{totalWatchTime}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 继续观看 */}
+          {playback.length > 0 && (
+            <div className="mb-14">
+              <h2 className="text-lg sm:text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>▶️ 继续观看</h2>
+              <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
+                {playback.map((item, i) => (
+                  <PlaybackCard key={`${item.type}-${item.id || i}`} item={item} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 即将上映 / 追剧 */}
+
           {(allUpcoming.length > 0 || tracking.length > 0) && (
             <div className="mb-14">
               <div className="flex items-center gap-4 mb-6">
