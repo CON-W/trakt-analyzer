@@ -1714,7 +1714,7 @@ app.get('/api/upcoming/tracking', async (req, res) => {
 });
 
 // ============ Playback (继续观看) ============
-// 获取用户未看完的播放进度
+// 获取用户未看完的播放进度，同一部剧的不同集合并显示
 app.get('/api/playback', async (req, res) => {
   const sessionId = req.headers['x-session-id'];
   if (!sessionId) return res.status(401).json({ error: 'Not authenticated' });
@@ -1729,22 +1729,45 @@ app.get('/api/playback', async (req, res) => {
       return progress > 0 && progress < 100;
     });
 
-    // 对每个项目获取海报信息
-    const enrichedPlayback = [];
-    for (const item of inProgress.slice(0, 20)) {
+    // 按 show.id 分组（剧集），电影单独
+    const showGroups = new Map(); // show.trakt_id -> { show info, episodes: [] }
+    const movies = [];
+
+    for (const item of inProgress) {
       const isMovie = item.type === 'movie';
-      const ids = isMovie ? item.movie?.ids : item.show?.ids;
-      const title = isMovie ? item.movie?.title : item.show?.title;
-      const year = isMovie ? item.movie?.year : item.show?.year;
+      if (isMovie) {
+        movies.push(item);
+      } else {
+        const showId = item.show?.ids?.trakt;
+        if (!showId) continue;
+        if (!showGroups.has(showId)) {
+          showGroups.set(showId, {
+            show: item.show,
+            episodes: [],
+            totalProgress: 0,
+          });
+        }
+        const group = showGroups.get(showId);
+        group.episodes.push(item);
+        group.totalProgress += item.progress || 0;
+      }
+    }
+
+    // 合并后的结果
+    const mergedPlayback = [];
+
+    // 处理电影（直接添加）
+    for (const item of movies) {
+      const ids = item.movie?.ids;
+      const title = item.movie?.title;
+      const year = item.movie?.year;
 
       let poster = null;
       let backdrop = null;
 
-      // 尝试从 TMDB 获取海报
       if (ids?.tmdb && TMDB_API_KEY) {
         try {
-          const mediaType = isMovie ? 'movie' : 'tv';
-          const detailRes = await axios.get(`${TMDB_API_URL}/${mediaType}/${ids.tmdb}`, {
+          const detailRes = await axios.get(`${TMDB_API_URL}/movie/${ids.tmdb}`, {
             params: { api_key: TMDB_API_KEY, language: TMDB_LANGUAGE },
             timeout: 3000,
           });
@@ -1753,46 +1776,86 @@ app.get('/api/playback', async (req, res) => {
           backdrop = d.backdrop_path ? `https://image.tmdb.org/t/p/w780${d.backdrop_path}` : null;
         } catch (e) {}
       }
-
-      // 回退到 Trakt 图片
       if (!poster && ids?.trakt) {
-        poster = getTraktPosterUrl(ids.trakt, isMovie ? 'movies' : 'shows');
+        poster = getTraktPosterUrl(ids.trakt, 'movies');
       }
 
-      enrichedPlayback.push({
+      mergedPlayback.push({
         id: ids?.trakt || ids?.tmdb,
         title,
         year,
-        type: isMovie ? 'movie' : 'show',
+        type: 'movie',
         poster,
         backdrop,
         progress: Math.round(item.progress || 0),
         paused_at: item.paused_at,
-        expires_at: item.expires_at,
-        // 剧集信息
-        episode: item.episode ? {
-          season: item.episode.season,
-          number: item.episode.number,
-          title: item.episode.title,
-        } : null,
-        // 电影信息
-        movie: isMovie ? {
-          title: item.movie?.title,
-          year: item.movie?.year,
-        } : null,
-        show: !isMovie ? {
-          title: item.show?.title,
-          year: item.show?.year,
-        } : null,
+        episodes: [], // 电影没有多集
+        episodeCount: 0,
       });
     }
 
-    res.json(enrichedPlayback);
+    // 处理剧集（合并同一部剧）
+    for (const [showId, group] of showGroups) {
+      const ids = group.show?.ids;
+      const title = group.show?.title;
+      const year = group.show?.year;
+      const avgProgress = Math.round(group.totalProgress / group.episodes.length);
+
+      let poster = null;
+      let backdrop = null;
+
+      if (ids?.tmdb && TMDB_API_KEY) {
+        try {
+          const detailRes = await axios.get(`${TMDB_API_URL}/tv/${ids.tmdb}`, {
+            params: { api_key: TMDB_API_KEY, language: TMDB_LANGUAGE },
+            timeout: 3000,
+          });
+          const d = detailRes.data;
+          poster = d.poster_path ? `https://image.tmdb.org/t/p/w342${d.poster_path}` : null;
+          backdrop = d.backdrop_path ? `https://image.tmdb.org/t/p/w780${d.backdrop_path}` : null;
+        } catch (e) {}
+      }
+      if (!poster && ids?.trakt) {
+        poster = getTraktPosterUrl(ids.trakt, 'shows');
+      }
+
+      // 按季/集排序
+      group.episodes.sort((a, b) => {
+        const sa = a.episode?.season || 0;
+        const sb = b.episode?.season || 0;
+        if (sa !== sb) return sa - sb;
+        return (a.episode?.number || 0) - (b.episode?.number || 0);
+      });
+
+      mergedPlayback.push({
+        id: ids?.trakt || ids?.tmdb,
+        title,
+        year,
+        type: 'show',
+        poster,
+        backdrop,
+        progress: avgProgress,
+        episodeCount: group.episodes.length,
+        episodes: group.episodes.map(item => ({
+          season: item.episode?.season,
+          number: item.episode?.number,
+          title: item.episode?.title,
+          progress: Math.round(item.progress || 0),
+          paused_at: item.paused_at,
+        })),
+      });
+    }
+
+    // 排序：进度低的在前（更需要继续看的）
+    mergedPlayback.sort((a, b) => a.progress - b.progress);
+
+    res.json(mergedPlayback);
   } catch (error) {
     console.error('Playback error:', error.message);
     res.json([]);
   }
 });
+
 
 // ============ 推荐内容 ============
 // 根据用户观看记录，从 TMDB 获取推荐（基于已看的高分作品）

@@ -497,6 +497,84 @@ function PlaybackCard({ item }) {
   );
 }
 
+// ============ 继续观看详情弹窗 ============
+function PlaybackModal({ item, onClose }) {
+  const isMovie = item.type === 'movie';
+  const episodes = item.episodes || [];
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+      <div className="relative w-full max-w-lg bg-[#1C1C1E] rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-scale-in max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* 海报头部 */}
+        <div className="relative h-48 flex-shrink-0 bg-gradient-to-br from-[#007AFF]/20 to-[#AF52DE]/20">
+          {item.backdrop ? (
+            <img src={item.backdrop} alt="" className="w-full h-full object-cover" />
+          ) : item.poster ? (
+            <img src={item.poster} alt="" className="w-full h-full object-cover" />
+          ) : null}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1C1C1E] via-[#1C1C1E]/60 to-transparent" />
+          <div className="absolute bottom-4 left-6 right-6">
+            <h3 className="text-2xl font-bold text-white">{item.title}</h3>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-sm text-white/70">{isMovie ? '🎬 电影' : '📺 剧集'}</span>
+              {item.year && <span className="text-sm text-white/50">{item.year}</span>}
+              <span className="text-sm text-white/50">总进度 {item.progress}%</span>
+              {!isMovie && episodes.length > 0 && (
+                <span className="text-sm text-white/50">{episodes.length} 集未看完</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          {isMovie ? (
+            <div className="text-center py-8">
+              <div className="text-5xl mb-4">🎬</div>
+              <p className="text-white/60">电影进度 {item.progress}%</p>
+              <div className="mt-4 w-full bg-white/10 rounded-full h-2">
+                <div className="h-full bg-[#007AFF] rounded-full transition-all" style={{ width: `${item.progress}%` }} />
+              </div>
+            </div>
+          ) : episodes.length > 0 ? (
+            <div>
+              <h4 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-4">未看完的剧集</h4>
+              <div className="space-y-2">
+                {episodes.map((ep, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+                    <div className="w-8 h-8 rounded-full bg-[#007AFF]/20 flex items-center justify-center text-sm font-bold text-[#007AFF] flex-shrink-0">
+                      S{ep.season}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white/85">E{ep.number}</span>
+                        {ep.title && <span className="text-sm text-white/50 truncate">{ep.title}</span>}
+                      </div>
+                      <div className="mt-1.5 w-full bg-white/10 rounded-full h-1.5">
+                        <div className="h-full bg-[#007AFF] rounded-full transition-all" style={{ width: `${ep.progress}%` }} />
+                      </div>
+                    </div>
+                    <span className="text-xs text-white/50 flex-shrink-0">{ep.progress}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-white/60">暂无详细信息</p>
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/60 transition-all">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ============ 主组件 ============
 export default function Dashboard() {
   const [analysis, setAnalysis] = useState(null);
@@ -504,6 +582,7 @@ export default function Dashboard() {
   const [tracking, setTracking] = useState([]);
   const [playback, setPlayback] = useState([]);
   const [upcomingTab, setUpcomingTab] = useState('upcoming');
+  const [selectedPlayback, setSelectedPlayback] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enriching, setEnriching] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -693,6 +772,9 @@ export default function Dashboard() {
       {selectedRecommendation && (
         <RecommendModal item={selectedRecommendation} onClose={() => setSelectedRecommendation(null)} />
       )}
+      {selectedPlayback && (
+        <PlaybackModal item={selectedPlayback} onClose={() => setSelectedPlayback(null)} />
+      )}
 
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* 顶部：台词轮播 - 左对齐 */}
@@ -775,44 +857,43 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 继续观看 */}
-          {playback.length > 0 && (
-            <div className="mb-14">
-              <h2 className="text-lg sm:text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>▶️ 继续观看</h2>
-              <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
-                {playback.map((item, i) => (
-                  <PlaybackCard key={`${item.type}-${item.id || i}`} item={item} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 即将上映 / 追剧 */}
-
-          {(allUpcoming.length > 0 || tracking.length > 0) && (
-            <div className="mb-14">
-              <div className="flex items-center gap-4 mb-6">
-                <h2 className="text-xl font-bold text-white/90" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>🎬 即将上映</h2>
-                <div className="flex bg-white/5 backdrop-blur-xl rounded-full p-1">
-                  <button onClick={() => setUpcomingTab('upcoming')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${upcomingTab === 'upcoming' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/70'}`}>新片</button>
-                  <button onClick={() => setUpcomingTab('tracking')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${upcomingTab === 'tracking' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/70'}`}>
-                    追剧
-                    {tracking.filter(t => { const d = t.next_episode?.air_date ? new Date(t.next_episode.air_date) : null; return d && Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24)) <= 7; }).length > 0 && (
-                      <span className="ml-1.5 bg-[#FF3B30] text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                        {tracking.filter(t => { const d = t.next_episode?.air_date ? new Date(t.next_episode.air_date) : null; return d && Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24)) <= 7; }).length}
-                      </span>
+          {/* 继续观看 / 即将上映 / 追剧 - 合并 tab */}
+          <div className="mb-14">
+            <div className="flex items-center gap-4 mb-6">
+              <h2 className="text-xl font-bold text-white/90" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>🎬 发现</h2>
+              <div className="flex bg-white/5 backdrop-blur-xl rounded-full p-1">
+                {playback.length > 0 && (
+                  <button onClick={() => setUpcomingTab('playback')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${upcomingTab === 'playback' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/70'}`}>
+                    继续
+                    {playback.length > 0 && (
+                      <span className="ml-1.5 bg-[#007AFF] text-white text-[10px] px-1.5 py-0.5 rounded-full">{playback.length}</span>
                     )}
                   </button>
-                </div>
-              </div>
-              <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
-                {upcomingTab === 'upcoming'
-                  ? allUpcoming.map((item, i) => <UpcomingCard key={`${item.type}-${item.id}`} item={item} />)
-                  : tracking.map((item, i) => <TrackingCard key={item.id} item={item} />)
-                }
+                )}
+                <button onClick={() => setUpcomingTab('upcoming')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${upcomingTab === 'upcoming' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/70'}`}>新片</button>
+                <button onClick={() => setUpcomingTab('tracking')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${upcomingTab === 'tracking' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/70'}`}>
+                  追剧
+                  {tracking.filter(t => { const d = t.next_episode?.air_date ? new Date(t.next_episode.air_date) : null; return d && Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24)) <= 7; }).length > 0 && (
+                    <span className="ml-1.5 bg-[#FF3B30] text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                      {tracking.filter(t => { const d = t.next_episode?.air_date ? new Date(t.next_episode.air_date) : null; return d && Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24)) <= 7; }).length}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
-          )}
+            <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
+              {upcomingTab === 'playback'
+                ? playback.map((item, i) => (
+                    <div key={`${item.type}-${item.id || i}`} onClick={() => setSelectedPlayback(item)}>
+                      <PlaybackCard item={item} />
+                    </div>
+                  ))
+                : upcomingTab === 'upcoming'
+                  ? allUpcoming.map((item, i) => <UpcomingCard key={`${item.type}-${item.id}`} item={item} />)
+                  : tracking.map((item, i) => <TrackingCard key={item.id} item={item} />)
+              }
+            </div>
+          </div>
 
           {/* 常看的人 */}
           {allPeople.length > 0 && (
