@@ -28,7 +28,8 @@ export default function AuthCallback() {
         setStatus('正在重定向到主页面...');
         setStatusType('loading');
         setTimeout(() => {
-          window.location.href = `/?code=${code}&state=${state}`;
+          window.location.href = `${import.meta.env.BASE_URL}?code=${code}&state=${state}`;
+
         }, 500);
       }
     } else {

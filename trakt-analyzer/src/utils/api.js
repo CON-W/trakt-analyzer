@@ -1,9 +1,16 @@
 import axios from 'axios';
 
+// API 基础路径 - 自动适配 Vite base 路径
+// 开发环境: /api
+// 生产环境(子路径): /trakt/api
+const API_BASE = `${import.meta.env.BASE_URL}api`;
+
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   timeout: 30000,
 });
+
 
 // Request interceptor to add session ID
 api.interceptors.request.use((config) => {
@@ -22,7 +29,8 @@ api.interceptors.response.use(
       const sessionId = localStorage.getItem('trakt_session_id');
       if (sessionId) {
         try {
-          const refreshResponse = await axios.post('/api/auth/refresh', { sessionId });
+          const refreshResponse = await axios.post(`${API_BASE}/auth/refresh`, { sessionId });
+
           if (refreshResponse.data.accessToken) {
             error.config.headers['X-Session-Id'] = sessionId;
             return axios(error.config);
@@ -54,7 +62,8 @@ export function fetchEnrichedHistory(type, { onProgress, onResult, onItem, onErr
 
   const controller = new AbortController();
 
-  fetch(`/api/history/enriched/${type}`, {
+  fetch(`${API_BASE}/history/enriched/${type}`, {
+
     headers: { 'X-Session-Id': sessionId },
     signal: controller.signal,
   })
@@ -125,7 +134,8 @@ export function fetchAnalysis(type, { onProgress, onResult, onRawResult, onError
 
   const controller = new AbortController();
 
-  fetch(`/api/analyze/${type}`, {
+  fetch(`${API_BASE}/analyze/${type}`, {
+
     headers: { 'X-Session-Id': sessionId },
     signal: controller.signal,
   })
@@ -192,7 +202,8 @@ export function fetchCombinedAnalysis({ onProgress, onResult, onRawResult, onErr
 
   const controller = new AbortController();
 
-  fetch('/api/analyze/combined', {
+  fetch(`${API_BASE}/analyze/combined`, {
+
     headers: { 'X-Session-Id': sessionId },
     signal: controller.signal,
   })

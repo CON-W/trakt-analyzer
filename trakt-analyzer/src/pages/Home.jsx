@@ -86,8 +86,9 @@ export default function Home() {
             setLoginStatus('登录成功！正在跳转...');
             setStatusType('success');
             setTimeout(() => {
-              window.location.href = '/dashboard';
+              window.location.href = `${import.meta.env.BASE_URL}dashboard`;
             }, 500);
+
           } else {
             setError('登录失败，请重试');
             setStatusType('error');

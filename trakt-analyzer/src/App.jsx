@@ -1,5 +1,6 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataCacheProvider } from './context/DataCacheContext';
 import Navbar from './components/Navbar';
