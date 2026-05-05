@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchCombinedAnalysis, API_BASE } from '../utils/api';
 import LoadingProgress from '../components/LoadingProgress';
+import { SkeletonCard, SkeletonPerson, SkeletonGenre, RefreshToast } from '../components/SkeletonCard';
 
 
 // ============ 背景海报墙 ============
@@ -597,6 +598,21 @@ export default function Dashboard() {
   const [recLoading, setRecLoading] = useState(false);
   const controllerRef = useRef(null);
   const scrollRef = useRef(null);
+  // 各模块独立 loading 状态
+  const [upcomingLoading, setUpcomingLoading] = useState(true);
+  const [trackingLoading, setTrackingLoading] = useState(true);
+  const [playbackLoading, setPlaybackLoading] = useState(true);
+  const [refreshToast, setRefreshToast] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
+
+  // 首次加载完成标记 - 用于区分首次和后续刷新
+  const isFirstLoad = useRef(true);
+
+  const showRefreshToast = useCallback((msg) => {
+    setRefreshMessage(msg);
+    setRefreshToast(true);
+    setTimeout(() => setRefreshToast(false), 3000);
+  }, []);
 
   useEffect(() => {
     loadAnalysis();
@@ -626,15 +642,18 @@ export default function Dashboard() {
     setRecLoading(false);
   };
 
-  const fetchPlayback = async () => {
+  const fetchPlayback = useCallback(async () => {
+    if (!isFirstLoad.current) showRefreshToast('正在刷新继续观看...');
+    setPlaybackLoading(true);
     try {
       const sessionId = localStorage.getItem('trakt_session_id');
-      if (!sessionId) return;
+      if (!sessionId) { setPlaybackLoading(false); return; }
       const res = await fetch(`${API_BASE}/playback`, { headers: { 'x-session-id': sessionId } });
       const data = await res.json();
       if (Array.isArray(data)) setPlayback(data);
     } catch (e) {}
-  };
+    setPlaybackLoading(false);
+  }, [showRefreshToast]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -655,28 +674,34 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchUpcoming = async () => {
+  const fetchUpcoming = useCallback(async () => {
+    if (!isFirstLoad.current) showRefreshToast('正在刷新新片...');
+    setUpcomingLoading(true);
     try { const res = await fetch(`${API_BASE}/upcoming`); const data = await res.json(); setUpcoming(data); } catch (e) {}
-  };
+    setUpcomingLoading(false);
+  }, [showRefreshToast]);
 
-  const fetchTracking = async () => {
+  const fetchTracking = useCallback(async () => {
+    if (!isFirstLoad.current) showRefreshToast('正在刷新追剧...');
+    setTrackingLoading(true);
     try {
       const sessionId = localStorage.getItem('trakt_session_id');
-      if (!sessionId) return;
+      if (!sessionId) { setTrackingLoading(false); return; }
       const res = await fetch(`${API_BASE}/upcoming/tracking`, { headers: { 'x-session-id': sessionId } });
       const data = await res.json();
       if (Array.isArray(data)) setTracking(data);
     } catch (e) {}
-  };
+    setTrackingLoading(false);
+  }, [showRefreshToast]);
 
   const loadAnalysis = () => {
     setLoading(true); setEnriching(false); setError(null); setProgress(0);
     setProgressMessage('正在获取你的观影记录...'); setProgressStep('fetch');
     controllerRef.current = fetchCombinedAnalysis({
       onProgress: (data) => { setProgress(data.progress); setProgressMessage(data.message); setProgressStep(data.step); },
-      onRawResult: (data) => { setAnalysis(data.data); setLoading(false); setEnriching(true); setShowSkeleton(false); },
-      onResult: (data) => { setAnalysis(data.data); setEnriching(false); setProgress(100); setProgressMessage('分析完成！'); setProgressStep('complete'); setShowSkeleton(false); },
-      onError: (msg) => { setError(msg); setLoading(false); setEnriching(false); setShowSkeleton(false); },
+      onRawResult: (data) => { setAnalysis(data.data); setLoading(false); setEnriching(true); setShowSkeleton(false); isFirstLoad.current = false; },
+      onResult: (data) => { setAnalysis(data.data); setEnriching(false); setProgress(100); setProgressMessage('分析完成！'); setProgressStep('complete'); setShowSkeleton(false); isFirstLoad.current = false; },
+      onError: (msg) => { setError(msg); setLoading(false); setEnriching(false); setShowSkeleton(false); isFirstLoad.current = false; },
     });
   };
 
@@ -765,6 +790,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-black">
       <BackgroundPoster items={analysis.topItems} onIndexChange={(idx) => setBgIndex(idx)} />
+
+      {/* 刷新 Toast - 后续刷新时显示，不遮挡页面 */}
+      <RefreshToast visible={refreshToast} message={refreshMessage} />
 
       {selectedPerson && (
         <PersonModal person={selectedPerson.person} type={selectedPerson.type} onClose={() => setSelectedPerson(null)} />
@@ -883,22 +911,28 @@ export default function Dashboard() {
             </div>
             <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
               {upcomingTab === 'playback'
-                ? playback.map((item, i) => (
-                    <div key={`${item.type}-${item.id || i}`} onClick={() => setSelectedPlayback(item)}>
-                      <PlaybackCard item={item} />
-                    </div>
-                  ))
+                ? playback.length > 0
+                  ? playback.map((item, i) => (
+                      <div key={`${item.type}-${item.id || i}`} onClick={() => setSelectedPlayback(item)}>
+                        <PlaybackCard item={item} />
+                      </div>
+                    ))
+                  : playbackLoading && <SkeletonCard count={4} width="w-36 sm:w-44" />
                 : upcomingTab === 'upcoming'
-                  ? allUpcoming.map((item, i) => <UpcomingCard key={`${item.type}-${item.id}`} item={item} />)
-                  : tracking.map((item, i) => <TrackingCard key={item.id} item={item} />)
+                  ? allUpcoming.length > 0
+                    ? allUpcoming.map((item, i) => <UpcomingCard key={`${item.type}-${item.id}`} item={item} />)
+                    : upcomingLoading && <SkeletonCard count={5} width="w-44" />
+                  : tracking.length > 0
+                    ? tracking.map((item, i) => <TrackingCard key={item.id} item={item} />)
+                    : trackingLoading && <SkeletonCard count={5} width="w-44" />
               }
             </div>
           </div>
 
           {/* 常看的人 */}
-          {allPeople.length > 0 && (
-            <div className="mb-14">
-              <h2 className="text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>👥 常看的人</h2>
+          <div className="mb-14">
+            <h2 className="text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>👥 常看的人</h2>
+            {allPeople.length > 0 ? (
               <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
                 {allPeople.map(({ person, type }) => (
                   <div
@@ -922,13 +956,15 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <SkeletonPerson count={4} />
+            )}
+          </div>
 
           {/* 为你推荐 */}
-          {recommendations.length > 0 && (
-            <div className="mb-14">
-              <h2 className="text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>🎯 为你推荐</h2>
+          <div className="mb-14">
+            <h2 className="text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>🎯 为你推荐</h2>
+            {recommendations.length > 0 ? (
               <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
                 {recommendations.map((item) => (
                   <div key={`${item.type}-${item.id}`} onClick={() => setSelectedRecommendation(item)} className="flex-shrink-0 w-36 group cursor-pointer animate-fade-in">
@@ -953,13 +989,15 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : recLoading ? (
+              <SkeletonCard count={5} width="w-36" />
+            ) : null}
+          </div>
 
           {/* 类型偏好 */}
-          {Array.isArray(analysis.genreDistribution) && analysis.genreDistribution.length > 0 && (
-            <div className="mb-14">
-              <h2 className="text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>🎭 看过的类型</h2>
+          <div className="mb-14">
+            <h2 className="text-xl font-bold text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>🎭 看过的类型</h2>
+            {Array.isArray(analysis.genreDistribution) && analysis.genreDistribution.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {analysis.genreDistribution.slice(0, 12).map((item) => {
                   const genre = Array.isArray(item) ? item[0] : item.genre || item.name;
@@ -977,8 +1015,10 @@ export default function Dashboard() {
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <SkeletonGenre />
+            )}
+          </div>
         </div>
       </div>
     </div>
