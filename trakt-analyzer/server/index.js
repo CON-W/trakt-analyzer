@@ -765,6 +765,17 @@ app.get('/api/analyze/combined', async (req, res) => {
     const allItems = [...dedupedMovies, ...dedupedShows];
 
     sendProgress('analyze', '正在快速分析...', 35);
+
+    // 在 raw 阶段，从 Trakt 原始数据中提取 genres 信息（不需要 TMDB）
+    // 这样 raw_result 就有部分数据可用，前端可以立即显示
+    for (const item of allItems) {
+      const isMovie = item._type === 'movies';
+      const rawGenres = isMovie ? item.movie?.genres : item.show?.genres;
+      if (rawGenres && rawGenres.length > 0) {
+        item._rawGenres = rawGenres;
+      }
+    }
+
     const rawAnalysis = analyzeCombinedData(dedupedMovies, dedupedShows, allItems);
 
     sendProgress('raw_result', `基础分析完成 (共 ${allItems.length} 部作品)，正在获取详细信息...`, 45);
@@ -1208,12 +1219,18 @@ function analyzeCombinedData(movieData, showData, allItems) {
         // Show: runtime per episode × episode count
         analysis.totalWatchMinutes += enriched.runtime * item._episodeCount;
       }
-      if (enriched.genres) {
-        enriched.genres.forEach(g => {
-          if (!genreCount[g]) genreCount[g] = 0;
-          genreCount[g]++;
-        });
-      }
+    }
+
+    // 优先使用 TMDB enriched 的 genres，其次使用 Trakt 原始数据的 genres (_rawGenres)
+    const genres = enriched?.genres || item._rawGenres || [];
+    if (genres.length > 0) {
+      genres.forEach(g => {
+        if (!genreCount[g]) genreCount[g] = 0;
+        genreCount[g]++;
+      });
+    }
+
+    if (enriched) {
       if (enriched.directors) {
         enriched.directors.forEach(d => {
           if (!directorCount[d]) directorCount[d] = 0;
